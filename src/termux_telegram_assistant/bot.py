@@ -6,6 +6,8 @@ from telegram import Message, Update
 from telegram.ext import Application, ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
 
 from termux_telegram_assistant.config import Settings, load_settings
+from termux_telegram_assistant.harness import HarnessContext, ai_text, ping_text, whoami_text
+from termux_telegram_assistant.openai_client import OpenAITextClient
 from termux_telegram_assistant.plugins import RoleRequest, default_plugins
 from termux_telegram_assistant.router import TopicRouter
 from termux_telegram_assistant.security import actor_id, is_authorized
@@ -21,6 +23,11 @@ class TelegramAssistant:
         self.store = JsonlStore(settings.data_dir)
         self.plugins = default_plugins()
         self.router = TopicRouter.from_file(settings.topic_routes_path, self.plugins)
+        self.openai_client = (
+            OpenAITextClient(api_key=settings.openai_api_key, model=settings.openai_model)
+            if settings.openai_api_key
+            else None
+        )
 
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if not self._allow(update):
@@ -36,9 +43,30 @@ class TelegramAssistant:
             return
         await self._reply(
             update.effective_message,
-            "명령: /start, /help, /roles, /topicid. 일반 텍스트 메시지는 message_thread_id 기준으로 라우팅합니다.",
+            (
+                "명령: /start, /help, /ping, /whoami, /topicid, /roles, /ai.\n"
+                "일반 텍스트 메시지는 message_thread_id 기준으로 라우팅합니다."
+            ),
             context,
         )
+
+    async def ping(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if not self._allow(update):
+            return
+        await self._reply(update.effective_message, ping_text(self._harness_context(update)), context)
+
+    async def whoami(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if not self._allow(update):
+            return
+        await self._reply(update.effective_message, whoami_text(self._harness_context(update)), context)
+
+    async def ai(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if not self._allow(update):
+            return
+
+        prompt = " ".join(context.args) if context.args else ""
+        response = await ai_text(self.openai_client, prompt)
+        await self._reply(update.effective_message, response, context)
 
     async def roles(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if not self._allow(update):
@@ -138,6 +166,14 @@ class TelegramAssistant:
             return text
         return text[: self.settings.reply_max_chars - 20] + "\n...[잘림]"
 
+    def _harness_context(self, update: Update) -> HarnessContext:
+        message = update.effective_message
+        return HarnessContext(
+            user_id=actor_id(update),
+            chat_id=message.chat_id if message else None,
+            message_thread_id=message.message_thread_id if message else None,
+        )
+
     async def _reply(self, message: Message | None, text: str, context: ContextTypes.DEFAULT_TYPE) -> None:
         if message is None:
             return
@@ -158,6 +194,9 @@ def build_application(settings: Settings | None = None) -> Application:
     application = ApplicationBuilder().token(settings.telegram_bot_token).concurrent_updates(True).build()
     application.add_handler(CommandHandler("start", assistant.start))
     application.add_handler(CommandHandler("help", assistant.help))
+    application.add_handler(CommandHandler("ping", assistant.ping))
+    application.add_handler(CommandHandler("whoami", assistant.whoami))
+    application.add_handler(CommandHandler("ai", assistant.ai))
     application.add_handler(CommandHandler("roles", assistant.roles))
     application.add_handler(CommandHandler("topicid", assistant.topic_id))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, assistant.handle_message))

@@ -63,7 +63,7 @@ def load_settings() -> Settings:
     return Settings(
         telegram_bot_token=token,
         openai_api_key=os.getenv("OPENAI_API_KEY") or None,
-        openai_model=os.getenv("OPENAI_MODEL", "gpt-5.5").strip(),
+        openai_model=os.getenv("OPENAI_MODEL", "gpt-4.1-mini").strip(),
         allowed_user_ids=_parse_user_ids(os.getenv("ALLOWED_USER_IDS")),
         topic_routes_path=_path_from_env("TOPIC_ROUTES_PATH", "config/topic_routes.json"),
         data_dir=_path_from_env("DATA_DIR", "data"),

@@ -4,7 +4,7 @@ from tempfile import TemporaryDirectory
 
 from hermes.hermes import (
     HermesContext,
-    HermesTokens,
+    BrainTokens,
     TokenStore,
     ask_text,
     auth_url_text,
@@ -48,7 +48,7 @@ class HermesTextTest(unittest.TestCase):
     def test_auth_url_text_requires_config(self):
         text = auth_url_text(auth_url="", client_id="", redirect_uri="", scope="")
 
-        self.assertIn("HERMES_AUTH_URL", text)
+        self.assertIn("OPENAI_AUTH_URL", text)
 
     def test_auth_url_text_returns_url(self):
         text = auth_url_text(
@@ -66,14 +66,14 @@ class TokenStoreTest(unittest.TestCase):
     def test_token_store_round_trips_tokens(self):
         with TemporaryDirectory() as tmp:
             store = TokenStore(Path(tmp) / "tokens.json")
-            tokens = HermesTokens(access_token="access", refresh_token="refresh", expires_in=3600)
+            tokens = BrainTokens(access_token="access", refresh_token="refresh", expires_in=3600)
 
             store.write(tokens)
 
             self.assertEqual(store.read(), tokens)
 
 
-class FakeHermesBrain:
+class FakeOpenAIBrain:
     async def ask(self, prompt: str) -> str:
         self.prompt = prompt
         return "hermes-ok"
@@ -91,7 +91,7 @@ class AsyncHermesTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn("/auth", response)
 
     async def test_ask_text_calls_brain(self):
-        brain = FakeHermesBrain()
+        brain = FakeOpenAIBrain()
 
         response = await ask_text(brain, "hello")
 

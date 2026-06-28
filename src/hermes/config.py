@@ -36,15 +36,15 @@ def _path_from_env(name: str, default: str) -> Path:
 class Settings:
     telegram_bot_token: str
     allowed_user_ids: frozenset[int]
-    hermes_auth_url: str
-    hermes_token_url: str
-    hermes_client_id: str
-    hermes_client_secret: str | None
-    hermes_redirect_uri: str
-    hermes_scope: str
-    hermes_api_base_url: str
-    hermes_chat_path: str
-    hermes_model: str
+    openai_auth_url: str
+    openai_token_url: str
+    openai_client_id: str
+    openai_client_secret: str | None
+    openai_redirect_uri: str
+    openai_scope: str
+    openai_api_base_url: str
+    openai_chat_path: str
+    openai_model: str
     topic_routes_path: Path
     data_dir: Path
     log_level: str
@@ -70,15 +70,15 @@ def load_settings() -> Settings:
     return Settings(
         telegram_bot_token=token,
         allowed_user_ids=_parse_user_ids(os.getenv("ALLOWED_USER_IDS")),
-        hermes_auth_url=os.getenv("HERMES_AUTH_URL", "").strip(),
-        hermes_token_url=os.getenv("HERMES_TOKEN_URL", "").strip(),
-        hermes_client_id=os.getenv("HERMES_CLIENT_ID", "").strip(),
-        hermes_client_secret=os.getenv("HERMES_CLIENT_SECRET") or None,
-        hermes_redirect_uri=os.getenv("HERMES_REDIRECT_URI", "urn:ietf:wg:oauth:2.0:oob").strip(),
-        hermes_scope=os.getenv("HERMES_SCOPE", "").strip(),
-        hermes_api_base_url=os.getenv("HERMES_API_BASE_URL", "").strip(),
-        hermes_chat_path=os.getenv("HERMES_CHAT_PATH", "/v1/chat/completions").strip(),
-        hermes_model=os.getenv("HERMES_MODEL", "hermes").strip(),
+        openai_auth_url=os.getenv("OPENAI_AUTH_URL", "").strip(),
+        openai_token_url=os.getenv("OPENAI_TOKEN_URL", "").strip(),
+        openai_client_id=os.getenv("OPENAI_CLIENT_ID", "").strip(),
+        openai_client_secret=os.getenv("OPENAI_CLIENT_SECRET") or None,
+        openai_redirect_uri=os.getenv("OPENAI_REDIRECT_URI", "urn:ietf:wg:oauth:2.0:oob").strip(),
+        openai_scope=os.getenv("OPENAI_SCOPE", "").strip(),
+        openai_api_base_url=os.getenv("OPENAI_API_BASE_URL", "").strip(),
+        openai_chat_path=os.getenv("OPENAI_CHAT_PATH", "/v1/chat/completions").strip(),
+        openai_model=os.getenv("OPENAI_MODEL", "gpt-4.1-mini").strip(),
         topic_routes_path=_path_from_env("TOPIC_ROUTES_PATH", "config/topic_routes.json"),
         data_dir=_path_from_env("DATA_DIR", "data"),
         log_level=os.getenv("LOG_LEVEL", "INFO").strip().upper(),

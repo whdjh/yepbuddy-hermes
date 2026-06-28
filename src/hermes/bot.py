@@ -7,7 +7,7 @@ from telegram.ext import Application, ApplicationBuilder, CommandHandler, Contex
 
 from hermes.config import Settings, load_settings
 from hermes.hermes import HermesContext, TokenStore, ask_text, auth_url_text, ping_text, whoami_text
-from hermes.hermes_client import HermesBrainClient, HermesOAuthClient
+from hermes.hermes_client import OpenAIBrainClient, OpenAIOAuthClient
 from hermes.plugins import RoleRequest, default_plugins
 from hermes.router import TopicRouter
 from hermes.security import actor_id, is_authorized
@@ -21,7 +21,7 @@ class HermesTelegramBot:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self.store = JsonlStore(settings.data_dir)
-        self.token_store = TokenStore(settings.data_dir / "hermes_tokens.json")
+        self.token_store = TokenStore(settings.data_dir / "openai_tokens.json")
         self.plugins = default_plugins()
         self.router = TopicRouter.from_file(settings.topic_routes_path, self.plugins)
 
@@ -61,10 +61,10 @@ class HermesTelegramBot:
             return
 
         response = auth_url_text(
-            auth_url=self.settings.hermes_auth_url,
-            client_id=self.settings.hermes_client_id,
-            redirect_uri=self.settings.hermes_redirect_uri,
-            scope=self.settings.hermes_scope,
+            auth_url=self.settings.openai_auth_url,
+            client_id=self.settings.openai_client_id,
+            redirect_uri=self.settings.openai_redirect_uri,
+            scope=self.settings.openai_scope,
         )
         await self._reply(update.effective_message, response, context)
 
@@ -74,31 +74,31 @@ class HermesTelegramBot:
 
         code = " ".join(context.args).strip() if context.args else ""
         if not code:
-            await self._reply(update.effective_message, "/authcode 뒤에 Hermes OAuth code를 붙여 주세요.", context)
+            await self._reply(update.effective_message, "/authcode 뒤에 OpenAI OAuth code를 붙여 주세요.", context)
             return
-        if not self.settings.hermes_token_url or not self.settings.hermes_client_id:
+        if not self.settings.openai_token_url or not self.settings.openai_client_id:
             await self._reply(
                 update.effective_message,
-                "Hermes OAuth 설정이 비어 있습니다: HERMES_TOKEN_URL, HERMES_CLIENT_ID",
+                "OpenAI OAuth 설정이 비어 있습니다: OPENAI_TOKEN_URL, OPENAI_CLIENT_ID",
                 context,
             )
             return
 
-        oauth = HermesOAuthClient(
-            token_url=self.settings.hermes_token_url,
-            client_id=self.settings.hermes_client_id,
-            client_secret=self.settings.hermes_client_secret,
-            redirect_uri=self.settings.hermes_redirect_uri,
+        oauth = OpenAIOAuthClient(
+            token_url=self.settings.openai_token_url,
+            client_id=self.settings.openai_client_id,
+            client_secret=self.settings.openai_client_secret,
+            redirect_uri=self.settings.openai_redirect_uri,
         )
         try:
             tokens = await oauth.exchange_code(code)
         except Exception:
-            LOGGER.exception("Hermes OAuth code 교환 실패")
-            await self._reply(update.effective_message, "Hermes OAuth code 교환에 실패했습니다. 로컬 로그를 확인하세요.", context)
+            LOGGER.exception("OpenAI OAuth code 교환 실패")
+            await self._reply(update.effective_message, "OpenAI OAuth code 교환에 실패했습니다. 로컬 로그를 확인하세요.", context)
             return
 
         self.token_store.write(tokens)
-        await self._reply(update.effective_message, "Hermes OAuth 토큰을 안드로이드 서버 로컬에 저장했습니다.", context)
+        await self._reply(update.effective_message, "OpenAI OAuth 토큰을 안드로이드 서버 로컬에 저장했습니다.", context)
 
     async def ask(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if not self._allow(update):
@@ -108,8 +108,8 @@ class HermesTelegramBot:
         try:
             response = await ask_text(self._brain(), prompt)
         except Exception:
-            LOGGER.exception("Hermes 질문 처리 실패")
-            response = "Hermes 질문 처리에 실패했습니다. 안드로이드 서버 Termux 로그를 확인하세요."
+            LOGGER.exception("OpenAI 질문 처리 실패")
+            response = "OpenAI 질문 처리에 실패했습니다. 안드로이드 서버 Termux 로그를 확인하세요."
         await self._reply(update.effective_message, response, context)
 
     async def roles(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -218,14 +218,14 @@ class HermesTelegramBot:
             message_thread_id=message.message_thread_id if message else None,
         )
 
-    def _brain(self) -> HermesBrainClient | None:
+    def _brain(self) -> OpenAIBrainClient | None:
         tokens = self.token_store.read()
-        if tokens is None or not self.settings.hermes_api_base_url:
+        if tokens is None or not self.settings.openai_api_base_url:
             return None
-        return HermesBrainClient(
-            api_base_url=self.settings.hermes_api_base_url,
-            chat_path=self.settings.hermes_chat_path,
-            model=self.settings.hermes_model,
+        return OpenAIBrainClient(
+            api_base_url=self.settings.openai_api_base_url,
+            chat_path=self.settings.openai_chat_path,
+            model=self.settings.openai_model,
             tokens=tokens,
         )
 

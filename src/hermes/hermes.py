@@ -15,14 +15,14 @@ class HermesContext:
 
 
 @dataclass(frozen=True)
-class HermesTokens:
+class BrainTokens:
     access_token: str
     refresh_token: str | None = None
     expires_in: int | None = None
     token_type: str = "Bearer"
 
 
-class HermesBrain(Protocol):
+class OpenAIBrain(Protocol):
     async def ask(self, prompt: str) -> str:
         ...
 
@@ -31,21 +31,21 @@ class TokenStore:
     def __init__(self, path: Path) -> None:
         self.path = path
 
-    def read(self) -> HermesTokens | None:
+    def read(self) -> BrainTokens | None:
         if not self.path.exists():
             return None
         with self.path.open("r", encoding="utf-8") as fp:
             data = json.load(fp)
         if not isinstance(data, dict) or not data.get("access_token"):
             return None
-        return HermesTokens(
+        return BrainTokens(
             access_token=str(data["access_token"]),
             refresh_token=data.get("refresh_token"),
             expires_in=data.get("expires_in"),
             token_type=str(data.get("token_type") or "Bearer"),
         )
 
-    def write(self, tokens: HermesTokens) -> None:
+    def write(self, tokens: BrainTokens) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.path.open("w", encoding="utf-8") as fp:
             json.dump(asdict(tokens), fp, ensure_ascii=False, indent=2)
@@ -93,14 +93,14 @@ def auth_url_text(*, auth_url: str, client_id: str, redirect_uri: str, scope: st
     missing = [
         name
         for name, value in {
-            "HERMES_AUTH_URL": auth_url,
-            "HERMES_CLIENT_ID": client_id,
-            "HERMES_REDIRECT_URI": redirect_uri,
+            "OPENAI_AUTH_URL": auth_url,
+            "OPENAI_CLIENT_ID": client_id,
+            "OPENAI_REDIRECT_URI": redirect_uri,
         }.items()
         if not value
     ]
     if missing:
-        return "Hermes OAuth 설정이 비어 있습니다: " + ", ".join(missing)
+        return "OpenAI OAuth 설정이 비어 있습니다: " + ", ".join(missing)
 
     url = build_authorization_url(
         auth_url=auth_url,
@@ -116,10 +116,10 @@ def auth_url_text(*, auth_url: str, client_id: str, redirect_uri: str, scope: st
     )
 
 
-async def ask_text(brain: HermesBrain | None, prompt: str) -> str:
+async def ask_text(brain: OpenAIBrain | None, prompt: str) -> str:
     prompt = prompt.strip()
     if not prompt:
-        return "/ask 뒤에 Hermes에게 보낼 문장을 붙여 주세요. 예: /ask 오늘 할 일을 정리해줘"
+        return "/ask 뒤에 OpenAI에게 보낼 문장을 붙여 주세요. 예: /ask 오늘 할 일을 정리해줘"
     if brain is None:
-        return "Hermes OAuth 토큰이 없습니다. 먼저 /auth 후 /authcode <code>를 완료하세요."
+        return "OpenAI OAuth 토큰이 없습니다. 먼저 /auth 후 /authcode <code>를 완료하세요."
     return await brain.ask(prompt)

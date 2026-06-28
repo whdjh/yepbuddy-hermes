@@ -7,7 +7,7 @@ from typing import Any
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from hermes.hermes import HermesTokens
+from hermes.hermes import BrainTokens
 
 
 def _post_json(url: str, headers: dict[str, str], body: dict[str, Any]) -> dict[str, Any]:
@@ -24,7 +24,7 @@ def _post_json(url: str, headers: dict[str, str], body: dict[str, Any]) -> dict[
     with urlopen(request, timeout=60) as response:
         data = json.loads(response.read().decode("utf-8"))
     if not isinstance(data, dict):
-        raise RuntimeError("Hermes API 응답이 JSON 객체가 아닙니다.")
+        raise RuntimeError("OpenAI API 응답이 JSON 객체가 아닙니다.")
     return data
 
 
@@ -41,18 +41,18 @@ def _post_form(url: str, body: dict[str, str]) -> dict[str, Any]:
     with urlopen(request, timeout=60) as response:
         data = json.loads(response.read().decode("utf-8"))
     if not isinstance(data, dict):
-        raise RuntimeError("Hermes OAuth 응답이 JSON 객체가 아닙니다.")
+        raise RuntimeError("OpenAI OAuth 응답이 JSON 객체가 아닙니다.")
     return data
 
 
 @dataclass(frozen=True)
-class HermesOAuthClient:
+class OpenAIOAuthClient:
     token_url: str
     client_id: str
     client_secret: str | None
     redirect_uri: str
 
-    async def exchange_code(self, code: str) -> HermesTokens:
+    async def exchange_code(self, code: str) -> BrainTokens:
         body = {
             "grant_type": "authorization_code",
             "code": code,
@@ -65,12 +65,12 @@ class HermesOAuthClient:
         data = await asyncio.to_thread(_post_form, self.token_url, body)
         access_token = data.get("access_token")
         if not isinstance(access_token, str) or not access_token:
-            raise RuntimeError("Hermes OAuth 응답에 access_token이 없습니다.")
+            raise RuntimeError("OpenAI OAuth 응답에 access_token이 없습니다.")
 
         refresh_token = data.get("refresh_token")
         expires_in = data.get("expires_in")
         token_type = data.get("token_type") or "Bearer"
-        return HermesTokens(
+        return BrainTokens(
             access_token=access_token,
             refresh_token=refresh_token if isinstance(refresh_token, str) else None,
             expires_in=expires_in if isinstance(expires_in, int) else None,
@@ -79,11 +79,11 @@ class HermesOAuthClient:
 
 
 @dataclass(frozen=True)
-class HermesBrainClient:
+class OpenAIBrainClient:
     api_base_url: str
     chat_path: str
     model: str
-    tokens: HermesTokens
+    tokens: BrainTokens
 
     async def ask(self, prompt: str) -> str:
         url = self.api_base_url.rstrip("/") + "/" + self.chat_path.lstrip("/")
@@ -121,4 +121,4 @@ def _extract_text(data: dict[str, Any]) -> str:
             if isinstance(content, str) and content:
                 return content
 
-    raise RuntimeError("Hermes API 응답에서 텍스트를 찾지 못했습니다.")
+    raise RuntimeError("OpenAI API 응답에서 텍스트를 찾지 못했습니다.")

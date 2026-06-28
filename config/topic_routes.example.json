@@ -1,0 +1,11 @@
+{
+  "description": "config/topic_routes.json으로 복사한 뒤 message_thread_id 값을 실제 Telegram forum topic ID로 바꾸십시오.",
+  "default_role": "ops_log",
+  "routes": {
+    "111": "app_promo",
+    "222": "health_research",
+    "333": "ai_research",
+    "444": "study_summary",
+    "555": "ops_log"
+  }
+}

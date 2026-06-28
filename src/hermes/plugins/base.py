@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
-from termux_telegram_assistant.storage import JsonlStore
+from hermes.storage import JsonlStore
 
 
 @dataclass(frozen=True)

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .base import RoleRequest, RoleResponse
-from termux_telegram_assistant.storage import JsonlStore
+from hermes.storage import JsonlStore
 
 
 @dataclass(frozen=True)
@@ -28,17 +28,17 @@ class StubRolePlugin:
             text=(
                 f"[{self.name}] stub 응답입니다.\n"
                 f"역할: {self.purpose}\n"
-                "현재는 입력을 JSONL에 기록하고 같은 topic으로 응답하는 뼈대만 동작합니다."
+                "현재는 입력을 안드로이드 서버 JSONL에 기록하고 같은 topic으로 응답합니다."
             )
         )
 
 
 def default_plugins() -> dict[str, StubRolePlugin]:
     plugins = [
-        StubRolePlugin("app_promo", "앱 홍보 문안과 배포 아이디어 정리"),
+        StubRolePlugin("app_promo", "아이디어와 배포 메모 정리"),
         StubRolePlugin("health_research", "건강/논문 리서치 메모 정리"),
-        StubRolePlugin("ai_research", "AI 도구와 논문/제품 리서치 정리"),
+        StubRolePlugin("ai_research", "Hermes 두뇌 테스트와 리서치 정리"),
         StubRolePlugin("study_summary", "공부 기록과 요약 노트 생성"),
-        StubRolePlugin("ops_log", "운영 로그, 알림, 시스템 상태 기록"),
+        StubRolePlugin("ops_log", "Hermes 운영 로그와 시스템 상태 기록"),
     ]
     return {plugin.name: plugin for plugin in plugins}

@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from termux_telegram_assistant.plugins import RolePlugin
-from termux_telegram_assistant.storage import JsonStore
+from hermes.plugins import RolePlugin
+from hermes.storage import JsonStore
 
 
 @dataclass(frozen=True)

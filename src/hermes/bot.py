@@ -5,36 +5,32 @@ import logging
 from telegram import Message, Update
 from telegram.ext import Application, ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
 
-from termux_telegram_assistant.config import Settings, load_settings
-from termux_telegram_assistant.harness import HarnessContext, ai_text, ping_text, whoami_text
-from termux_telegram_assistant.openai_client import OpenAITextClient
-from termux_telegram_assistant.plugins import RoleRequest, default_plugins
-from termux_telegram_assistant.router import TopicRouter
-from termux_telegram_assistant.security import actor_id, is_authorized
-from termux_telegram_assistant.storage import JsonlStore
+from hermes.config import Settings, load_settings
+from hermes.hermes import HermesContext, TokenStore, ask_text, auth_url_text, ping_text, whoami_text
+from hermes.hermes_client import HermesBrainClient, HermesOAuthClient
+from hermes.plugins import RoleRequest, default_plugins
+from hermes.router import TopicRouter
+from hermes.security import actor_id, is_authorized
+from hermes.storage import JsonlStore
 
 
 LOGGER = logging.getLogger(__name__)
 
 
-class TelegramAssistant:
+class HermesTelegramBot:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self.store = JsonlStore(settings.data_dir)
+        self.token_store = TokenStore(settings.data_dir / "hermes_tokens.json")
         self.plugins = default_plugins()
         self.router = TopicRouter.from_file(settings.topic_routes_path, self.plugins)
-        self.openai_client = (
-            OpenAITextClient(api_key=settings.openai_api_key, model=settings.openai_model)
-            if settings.openai_api_key
-            else None
-        )
 
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if not self._allow(update):
             return
         await self._reply(
             update.effective_message,
-            "Termux Telegram 개인 비서가 실행 중입니다. 설정된 role은 /roles로 확인하십시오.",
+            "Hermes가 안드로이드 서버에서 실행 중입니다. /ping, /whoami, /auth, /ask를 확인하세요.",
             context,
         )
 
@@ -44,7 +40,7 @@ class TelegramAssistant:
         await self._reply(
             update.effective_message,
             (
-                "명령: /start, /help, /ping, /whoami, /topicid, /roles, /ai.\n"
+                "명령: /start, /help, /ping, /whoami, /topicid, /auth, /authcode, /ask, /roles.\n"
                 "일반 텍스트 메시지는 message_thread_id 기준으로 라우팅합니다."
             ),
             context,
@@ -53,19 +49,67 @@ class TelegramAssistant:
     async def ping(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if not self._allow(update):
             return
-        await self._reply(update.effective_message, ping_text(self._harness_context(update)), context)
+        await self._reply(update.effective_message, ping_text(self._hermes_context(update)), context)
 
     async def whoami(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if not self._allow(update):
             return
-        await self._reply(update.effective_message, whoami_text(self._harness_context(update)), context)
+        await self._reply(update.effective_message, whoami_text(self._hermes_context(update)), context)
 
-    async def ai(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    async def auth(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if not self._allow(update):
+            return
+
+        response = auth_url_text(
+            auth_url=self.settings.hermes_auth_url,
+            client_id=self.settings.hermes_client_id,
+            redirect_uri=self.settings.hermes_redirect_uri,
+            scope=self.settings.hermes_scope,
+        )
+        await self._reply(update.effective_message, response, context)
+
+    async def authcode(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if not self._allow(update):
+            return
+
+        code = " ".join(context.args).strip() if context.args else ""
+        if not code:
+            await self._reply(update.effective_message, "/authcode 뒤에 Hermes OAuth code를 붙여 주세요.", context)
+            return
+        if not self.settings.hermes_token_url or not self.settings.hermes_client_id:
+            await self._reply(
+                update.effective_message,
+                "Hermes OAuth 설정이 비어 있습니다: HERMES_TOKEN_URL, HERMES_CLIENT_ID",
+                context,
+            )
+            return
+
+        oauth = HermesOAuthClient(
+            token_url=self.settings.hermes_token_url,
+            client_id=self.settings.hermes_client_id,
+            client_secret=self.settings.hermes_client_secret,
+            redirect_uri=self.settings.hermes_redirect_uri,
+        )
+        try:
+            tokens = await oauth.exchange_code(code)
+        except Exception:
+            LOGGER.exception("Hermes OAuth code 교환 실패")
+            await self._reply(update.effective_message, "Hermes OAuth code 교환에 실패했습니다. 로컬 로그를 확인하세요.", context)
+            return
+
+        self.token_store.write(tokens)
+        await self._reply(update.effective_message, "Hermes OAuth 토큰을 안드로이드 서버 로컬에 저장했습니다.", context)
+
+    async def ask(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if not self._allow(update):
             return
 
         prompt = " ".join(context.args) if context.args else ""
-        response = await ai_text(self.openai_client, prompt)
+        try:
+            response = await ask_text(self._brain(), prompt)
+        except Exception:
+            LOGGER.exception("Hermes 질문 처리 실패")
+            response = "Hermes 질문 처리에 실패했습니다. 안드로이드 서버 Termux 로그를 확인하세요."
         await self._reply(update.effective_message, response, context)
 
     async def roles(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -166,12 +210,23 @@ class TelegramAssistant:
             return text
         return text[: self.settings.reply_max_chars - 20] + "\n...[잘림]"
 
-    def _harness_context(self, update: Update) -> HarnessContext:
+    def _hermes_context(self, update: Update) -> HermesContext:
         message = update.effective_message
-        return HarnessContext(
+        return HermesContext(
             user_id=actor_id(update),
             chat_id=message.chat_id if message else None,
             message_thread_id=message.message_thread_id if message else None,
+        )
+
+    def _brain(self) -> HermesBrainClient | None:
+        tokens = self.token_store.read()
+        if tokens is None or not self.settings.hermes_api_base_url:
+            return None
+        return HermesBrainClient(
+            api_base_url=self.settings.hermes_api_base_url,
+            chat_path=self.settings.hermes_chat_path,
+            model=self.settings.hermes_model,
+            tokens=tokens,
         )
 
     async def _reply(self, message: Message | None, text: str, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -189,17 +244,19 @@ class TelegramAssistant:
 
 def build_application(settings: Settings | None = None) -> Application:
     settings = settings or load_settings()
-    assistant = TelegramAssistant(settings)
+    bot = HermesTelegramBot(settings)
 
     application = ApplicationBuilder().token(settings.telegram_bot_token).concurrent_updates(True).build()
-    application.add_handler(CommandHandler("start", assistant.start))
-    application.add_handler(CommandHandler("help", assistant.help))
-    application.add_handler(CommandHandler("ping", assistant.ping))
-    application.add_handler(CommandHandler("whoami", assistant.whoami))
-    application.add_handler(CommandHandler("ai", assistant.ai))
-    application.add_handler(CommandHandler("roles", assistant.roles))
-    application.add_handler(CommandHandler("topicid", assistant.topic_id))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, assistant.handle_message))
+    application.add_handler(CommandHandler("start", bot.start))
+    application.add_handler(CommandHandler("help", bot.help))
+    application.add_handler(CommandHandler("ping", bot.ping))
+    application.add_handler(CommandHandler("whoami", bot.whoami))
+    application.add_handler(CommandHandler("auth", bot.auth))
+    application.add_handler(CommandHandler("authcode", bot.authcode))
+    application.add_handler(CommandHandler("ask", bot.ask))
+    application.add_handler(CommandHandler("roles", bot.roles))
+    application.add_handler(CommandHandler("topicid", bot.topic_id))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, bot.handle_message))
     return application
 
 

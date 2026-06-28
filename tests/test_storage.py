@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from termux_telegram_assistant.storage import JsonlStore
+from hermes.storage import JsonlStore
 
 
 class JsonlStoreTest(unittest.TestCase):

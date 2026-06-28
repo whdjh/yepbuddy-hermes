@@ -35,9 +35,16 @@ def _path_from_env(name: str, default: str) -> Path:
 @dataclass(frozen=True)
 class Settings:
     telegram_bot_token: str
-    openai_api_key: str | None
-    openai_model: str
     allowed_user_ids: frozenset[int]
+    hermes_auth_url: str
+    hermes_token_url: str
+    hermes_client_id: str
+    hermes_client_secret: str | None
+    hermes_redirect_uri: str
+    hermes_scope: str
+    hermes_api_base_url: str
+    hermes_chat_path: str
+    hermes_model: str
     topic_routes_path: Path
     data_dir: Path
     log_level: str
@@ -62,9 +69,16 @@ def load_settings() -> Settings:
 
     return Settings(
         telegram_bot_token=token,
-        openai_api_key=os.getenv("OPENAI_API_KEY") or None,
-        openai_model=os.getenv("OPENAI_MODEL", "gpt-4.1-mini").strip(),
         allowed_user_ids=_parse_user_ids(os.getenv("ALLOWED_USER_IDS")),
+        hermes_auth_url=os.getenv("HERMES_AUTH_URL", "").strip(),
+        hermes_token_url=os.getenv("HERMES_TOKEN_URL", "").strip(),
+        hermes_client_id=os.getenv("HERMES_CLIENT_ID", "").strip(),
+        hermes_client_secret=os.getenv("HERMES_CLIENT_SECRET") or None,
+        hermes_redirect_uri=os.getenv("HERMES_REDIRECT_URI", "urn:ietf:wg:oauth:2.0:oob").strip(),
+        hermes_scope=os.getenv("HERMES_SCOPE", "").strip(),
+        hermes_api_base_url=os.getenv("HERMES_API_BASE_URL", "").strip(),
+        hermes_chat_path=os.getenv("HERMES_CHAT_PATH", "/v1/chat/completions").strip(),
+        hermes_model=os.getenv("HERMES_MODEL", "hermes").strip(),
         topic_routes_path=_path_from_env("TOPIC_ROUTES_PATH", "config/topic_routes.json"),
         data_dir=_path_from_env("DATA_DIR", "data"),
         log_level=os.getenv("LOG_LEVEL", "INFO").strip().upper(),

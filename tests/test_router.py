@@ -3,8 +3,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from termux_telegram_assistant.plugins.stubs import default_plugins
-from termux_telegram_assistant.router import TopicRouter
+from hermes.plugins.stubs import default_plugins
+from hermes.router import TopicRouter
 
 
 class TopicRouterTest(unittest.TestCase):

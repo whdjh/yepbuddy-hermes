@@ -6,6 +6,7 @@ cd "$(dirname "$0")/.."
 git pull --ff-only
 . .venv/bin/activate
 pip install -r requirements.txt
+pip install -e .
 
 echo
 echo "Update complete."

@@ -1,247 +1,111 @@
-# Hermes
+# Yepbuddy Hermes
 
-Hermes는 안드로이드 서버의 Termux에서 실행하고, 텔레그램용 핸드폰으로 조종하는 개인 비서입니다.
+안드로이드 서버에서 공식 NousResearch Hermes Agent를 설치하고 실행하기 위한 bootstrap repo입니다.
+
+이 repo는 Hermes 본체가 아닙니다. 직접 만든 Telegram bot/OAuth 코드는 제거했습니다. 실제 설치 대상은 공식 Hermes Agent입니다.
+
+공식 문서:
+- Termux 설치: https://hermes-agent.nousresearch.com/docs/getting-started/termux
+- Hermes Agent docs: https://hermes-agent.nousresearch.com/docs
+
+## 구조
 
 ```text
 텔레그램용 핸드폰
-  -> Telegram bot으로 명령 전송
+  Hermes/Telegram gateway 조종용
 
 안드로이드 서버 Termux
-  -> Hermes 프로세스 실행
-  -> OpenAI OAuth token 저장
-  -> 로컬 JSON/JSONL 저장
-  -> Telegram으로 응답
+  공식 Hermes Agent 실행
+  Nous Portal OAuth 로그인
+  로컬 데이터와 설정 저장
 
-OpenAI API
-  -> OAuth로 연결되는 두뇌
+Nous Portal / Hermes Agent
+  OAuth, 모델 설정, 도구 gateway
 ```
 
-GitHub에는 코드만 저장합니다. `.env`, `config/topic_routes.json`, `data/*.jsonl`, `data/openai_tokens.json`은 안드로이드 서버 로컬에만 둡니다.
+OAuth는 로그인 방식입니다. OAuth 자체가 과금 상품은 아닙니다. 실제 모델 사용 비용이나 무료 제공 범위는 연결한 모델/provider 정책을 따릅니다.
 
-## 현재 범위
+## 1. 설치
 
-- Telegram bot 연결 확인: `/ping`
-- 내 Telegram user/topic 확인: `/whoami`, `/topicid`
-- OpenAI OAuth 시작: `/auth`
-- OpenAI OAuth code 저장: `/authcode <code>`
-- OpenAI에게 질문: `/ask <질문>`
-- topic route 기반 stub role 기록은 유지
-
-## 1. Telegram bot 만들기
-
-텔레그램용 핸드폰에서 `@BotFather`를 엽니다.
-
-```text
-/newbot
-```
-
-봇 이름과 username을 만들면 BotFather가 HTTP API token을 줍니다. 이 값은 안드로이드 서버 `.env`의 `TELEGRAM_BOT_TOKEN`에 넣습니다.
-
-그룹 일반 메시지를 받게 하려면 privacy를 끕니다.
-
-```text
-/setprivacy
-```
-
-방금 만든 봇을 선택하고 `Disable`을 선택합니다.
-
-## 2. 내 Telegram user id 확인
-
-텔레그램용 핸드폰에서 `@userinfobot` 또는 `@RawDataBot`에 `/start`를 보냅니다.
-
-나오는 숫자 ID를 기록합니다.
-
-```text
-123456789
-```
-
-이 값은 안드로이드 서버 `.env`의 `ALLOWED_USER_IDS`에 넣습니다. 비워 두면 Hermes는 모든 Telegram update를 거부합니다.
-
-## 3. Mac에서 repo 준비
-
-현재 GitHub repo는 `whdjh/yepbuddy-hermes`입니다.
-
-기존 remote 확인:
+안드로이드 서버 Termux에서:
 
 ```bash
-git remote -v
-```
-
-remote가 다른 경로를 보고 있으면 바꾸기:
-
-```bash
-git remote set-url origin git@github.com:whdjh/yepbuddy-hermes.git
-```
-
-아직 remote가 없다면:
-
-```bash
-git remote add origin git@github.com:whdjh/yepbuddy-hermes.git
-```
-
-push:
-
-```bash
-git push -u origin main
-```
-
-HTTPS clone을 쓸 거면 remote URL은 `https://github.com/whdjh/yepbuddy-hermes.git`로 써도 됩니다.
-
-## 4. 안드로이드 서버 Termux 설치
-
-안드로이드 서버에서 Termux를 엽니다.
-
-```bash
-pkg update
-pkg install git
 git clone https://github.com/whdjh/yepbuddy-hermes.git
 cd yepbuddy-hermes
-bash scripts/install_termux.sh
+bash scripts/install_android.sh
 ```
 
-설치가 끝나면 `.env`를 편집합니다.
+이 스크립트는 Termux 패키지를 설치한 뒤 공식 installer를 실행합니다.
+
+공식 installer 명령:
 
 ```bash
-nano .env
+curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
 ```
 
-최소값:
-
-```env
-TELEGRAM_BOT_TOKEN=BotFather에서_받은_token
-ALLOWED_USER_IDS=텔레그램용_핸드폰_Telegram_user_id
-
-OPENAI_AUTH_URL=https://...
-OPENAI_TOKEN_URL=https://...
-OPENAI_CLIENT_ID=...
-OPENAI_CLIENT_SECRET=...
-OPENAI_REDIRECT_URI=urn:ietf:wg:oauth:2.0:oob
-OPENAI_SCOPE=
-
-OPENAI_API_BASE_URL=https://...
-OPENAI_CHAT_PATH=/v1/chat/completions
-OPENAI_MODEL=gpt-4.1-mini
-
-TOPIC_ROUTES_PATH=config/topic_routes.json
-DATA_DIR=data
-LOG_LEVEL=INFO
-REPLY_MAX_CHARS=3500
-```
-
-`nano` 저장은 `Ctrl+O`, Enter, 종료는 `Ctrl+X`입니다.
-
-## 5. Hermes 실행
-
-안드로이드 서버 Termux에서:
+## 2. 상태 확인
 
 ```bash
-cd yepbuddy-hermes
-bash scripts/run_termux.sh
+bash scripts/doctor.sh
 ```
 
-처음에는 자동 실행보다 이 방식으로 연결부터 확인합니다. Termux가 켜져 있어야 Hermes가 동작합니다.
-
-## 6. Telegram 연결 확인
-
-텔레그램용 핸드폰에서 Hermes 봇 개인 DM에 보냅니다.
-
-```text
-/ping
-```
-
-정상 응답 예:
-
-```text
-Hermes가 안드로이드 서버에서 실행 중입니다.
-user_id: 123456789
-chat_id: -100...
-message_thread_id: 123
-```
-
-내 id와 topic id 확인:
-
-```text
-/whoami
-/topicid
-```
-
-개인 DM에서는 `message_thread_id: None`이 정상입니다. group/topic을 쓰지 않으면 `config/topic_routes.json`은 건드리지 않아도 됩니다.
-
-## 7. OpenAI OAuth 연결
-
-Hermes 봇 개인 DM에서:
-
-```text
-/auth
-```
-
-Hermes가 OpenAI OAuth 로그인 URL을 보냅니다. 텔레그램용 핸드폰 브라우저에서 열고 로그인합니다.
-
-로그인 후 받은 OAuth code를 다시 Telegram으로 보냅니다.
-
-```text
-/authcode 받은_code
-```
-
-성공하면 token이 안드로이드 서버의 `data/openai_tokens.json`에 저장됩니다. 이 파일은 GitHub에 올라가지 않습니다.
-
-## 8. OpenAI에게 질문
-
-Hermes 봇 개인 DM에서:
-
-```text
-/ask 오늘 할 일을 세 줄로 정리해줘
-```
-
-OpenAI API 응답이 오면 연결 완료입니다.
-
-`/ask`가 실패하면 먼저 아래를 확인합니다.
-
-- `.env`의 `OPENAI_API_BASE_URL`
-- `.env`의 `OPENAI_CHAT_PATH`
-- `.env`의 `OPENAI_MODEL`
-- `data/openai_tokens.json` 존재 여부
-- Termux 로그
-
-## 9. 데이터 확인
-
-안드로이드 서버 Termux에서:
+또는 직접:
 
 ```bash
-ls data
-cat data/openai_tokens.json
-cat data/role_events.jsonl
-cat data/denied_updates.jsonl
+hermes version
+hermes doctor
 ```
 
-`data/openai_tokens.json`은 secret입니다. 캡처하거나 GitHub에 올리지 마십시오.
-
-## 10. Mac에서 개발한 뒤 안드로이드 서버에 반영
-
-Mac:
+## 3. OAuth / Portal 설정
 
 ```bash
-git add .
-git commit -m "feat: 변경 설명"
-git push
+bash scripts/setup_portal.sh
 ```
 
-안드로이드 서버 Termux:
+또는 직접:
 
 ```bash
-cd yepbuddy-hermes
-bash scripts/update_termux.sh
-bash scripts/run_termux.sh
+hermes setup --portal
 ```
 
-## 현재 명령
+로그인 URL이 나오면 텔레그램용 핸드폰 브라우저에서 열어 로그인합니다. 안드로이드 서버는 Termux 실행과 token 저장을 담당합니다.
 
-- `/start`: Hermes 시작 확인
-- `/help`: 명령 목록
-- `/ping`: Telegram 연결 확인
-- `/whoami`: Telegram user id, chat id, topic id 확인
-- `/topicid`: 현재 topic의 `message_thread_id` 확인
-- `/auth`: OpenAI OAuth 로그인 URL 생성
-- `/authcode <code>`: OpenAI OAuth token 저장
-- `/ask <질문>`: OpenAI에게 질문
-- `/roles`: topic route와 role 목록 확인
+## 4. 실행
+
+```bash
+bash scripts/run_hermes.sh
+```
+
+또는 직접:
+
+```bash
+hermes
+```
+
+## 5. 업데이트
+
+```bash
+cd ~/yepbuddy-hermes
+git pull
+bash scripts/update_android.sh
+```
+
+## 안드로이드에서 다시 설치할 때
+
+기존 bootstrap repo만 지우려면:
+
+```bash
+cd ~
+rm -rf yepbuddy-hermes
+```
+
+Hermes Agent 자체 설정/캐시는 공식 Hermes Agent가 쓰는 위치에 남을 수 있습니다. 완전 삭제는 공식 uninstall 문서나 `hermes`가 제공하는 uninstall 명령을 확인한 뒤 진행하십시오.
+
+## 지금 이 repo가 하지 않는 것
+
+- 자체 Telegram bot 구현
+- 자체 OAuth 서버 구현
+- OpenAI API key 저장
+- 직접 모델 API wrapping
+
+이제 Hermes Agent 본체가 제공하는 기능을 그대로 사용합니다.

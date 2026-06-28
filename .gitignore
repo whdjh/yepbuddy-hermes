@@ -5,8 +5,5 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-
-# Local runtime data and local topic mapping may contain personal metadata.
-data/*.json
-data/*.jsonl
-config/topic_routes.json
+node_modules/
+*.log

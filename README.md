@@ -1,111 +1,39 @@
-# Yepbuddy Hermes
+# 안드로이드 기기 기반 Hermes Agent
 
-안드로이드 서버에서 공식 NousResearch Hermes Agent를 설치하고 실행하기 위한 bootstrap repo입니다.
+남는 안드로이드 기기에서 Hermes Agent를 실행하고 GPT Codex를 연결해, Telegram을 통해 개인 AI Agent로 사용하고 있습니다.
 
-이 repo는 Hermes 본체가 아닙니다. 직접 만든 Telegram bot/OAuth 코드는 제거했습니다. 실제 설치 대상은 공식 Hermes Agent입니다.
+![전체 구조](./assets/architecture.png)
 
-공식 문서:
-- Termux 설치: https://hermes-agent.nousresearch.com/docs/getting-started/termux
-- Hermes Agent docs: https://hermes-agent.nousresearch.com/docs
+## 만든 이유
 
-## 구조
+Threads에 개발 카드뉴스와 기술 글을 직접 제작해 올리며 **지인 유입 없이 약 한 달 만에 팔로워 300명**을 만들었습니다.
 
-```text
-텔레그램용 핸드폰
-  Hermes/Telegram gateway 조종용
+직접 운영하면서 카드뉴스 형식에 대한 반응을 확인했지만, 내용을 정리하고 카드뉴스와 글을 각각 만들고 게시하는 과정이 반복됐습니다.
 
-안드로이드 서버 Termux
-  공식 Hermes Agent 실행
-  Nous Portal OAuth 로그인
-  로컬 데이터와 설정 저장
+이 과정을 줄이기 위해 남는 안드로이드 기기를 활용해 개인 AI Agent 환경을 구성하고, 콘텐츠 제작부터 게시까지 자동화하고 있습니다.
 
-Nous Portal / Hermes Agent
-  OAuth, 모델 설정, 도구 gateway
-```
+## 직접 운영 결과
 
-OAuth는 로그인 방식입니다. OAuth 자체가 과금 상품은 아닙니다. 실제 모델 사용 비용이나 무료 제공 범위는 연결한 모델/provider 정책을 따릅니다.
+실제로 제작해 게시한 카드뉴스입니다.
 
-## 1. 설치
+![Threads 카드뉴스](./assets/threads-cardnews.png)
 
-안드로이드 서버 Termux에서:
+게시 후 받은 실제 반응입니다.
 
-```bash
-git clone https://github.com/whdjh/yepbuddy-hermes.git
-cd yepbuddy-hermes
-bash scripts/install_android.sh
-```
+![Threads 반응](./assets/threads-feedback.png)
 
-이 스크립트는 Termux 패키지를 설치한 뒤 공식 installer를 실행합니다.
+카드뉴스를 직접 운영하며 콘텐츠 형식의 가능성을 확인했고, 반복되는 제작 과정을 자동화할 가치가 있다고 판단했습니다.
 
-공식 installer 명령:
+## 현재 구성
 
-```bash
-curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
-```
+- [x] 안드로이드 기기에서 Termux와 Hermes Agent 실행
+- [x] Hermes Agent와 GPT Codex 연결
+- [x] Telegram을 통해 Agent 사용
+- [x] Threads API 인증 및 텍스트 게시 검증
+- [ ] 이미지 게시 및 사용자 승인 후 게시 흐름
 
-## 2. 상태 확인
+## 자동화 방향
 
-```bash
-bash scripts/doctor.sh
-```
+직접 정리한 내용을 Telegram으로 전달하면 Hermes가 카드뉴스와 Threads 글을 생성하고, 결과를 확인·수정한 뒤 **사용자가 승인한 콘텐츠만 게시**하는 흐름을 구성하고 있습니다.
 
-또는 직접:
-
-```bash
-hermes version
-hermes doctor
-```
-
-## 3. OAuth / Portal 설정
-
-```bash
-bash scripts/setup_portal.sh
-```
-
-또는 직접:
-
-```bash
-hermes setup --portal
-```
-
-로그인 URL이 나오면 텔레그램용 핸드폰 브라우저에서 열어 로그인합니다. 안드로이드 서버는 Termux 실행과 token 저장을 담당합니다.
-
-## 4. 실행
-
-```bash
-bash scripts/run_hermes.sh
-```
-
-또는 직접:
-
-```bash
-hermes
-```
-
-## 5. 업데이트
-
-```bash
-cd ~/yepbuddy-hermes
-git pull
-bash scripts/update_android.sh
-```
-
-## 안드로이드에서 다시 설치할 때
-
-기존 bootstrap repo만 지우려면:
-
-```bash
-cd ~
-rm -rf yepbuddy-hermes
-```
-
-Hermes Agent 자체 설정/캐시는 공식 Hermes Agent가 쓰는 위치에 남을 수 있습니다. 완전 삭제는 공식 uninstall 문서나 `hermes`가 제공하는 uninstall 명령을 확인한 뒤 진행하십시오.
-
-## 지금 이 repo가 하지 않는 것
-
-- 자체 Telegram bot 구현
-- 자체 OAuth 서버 구현
-- OpenAI API key 저장
-- 직접 모델 API wrapping
-
-이제 Hermes Agent 본체가 제공하는 기능을 그대로 사용합니다.
+이후에는 Threads의 헬스·운동 관련 게시글을 주기적으로 수집하고 정리해 YepBuddy의 기능 아이디어와 콘텐츠·광고 소재를 제안하는 방향으로 확장할 예정입니다.

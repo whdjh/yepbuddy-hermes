@@ -1,0 +1,162 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+
+description: Codex 로그인으로 Threads 프롬프트 평가
+
+prompts:
+  - file://prompts/threads.md
+
+providers:
+  - id: openai:codex-sdk
+    label: codex-login
+    config: &codex-config
+      working_dir: .
+      sandbox_mode: read-only
+      approval_policy: never
+      network_access_enabled: false
+      web_search_mode: disabled
+      model_reasoning_effort: low
+      enable_streaming: false
+      prefix: |
+        파일을 수정하거나 명령을 실행하지 말고 최종 답변 텍스트만 작성하세요.
+
+defaultTest:
+  options:
+    disableVarExpansion: true
+  assert:
+    - type: javascript
+      metric: thread-numbering
+      value: '(() => { const headings = [...output.matchAll(/^(\d+)\s*\/\s*(\d+)\s*$/gm)]; return headings.length >= 6 && headings.length <= 9 && headings.every((match, index) => Number(match[1]) === index + 1 && Number(match[2]) === headings.length); })()'
+
+    - type: javascript
+      metric: thread-count-fit
+      value: '(() => { const count = [...output.matchAll(/^\d+\s*\/\s*\d+\s*$/gm)].length; const min = Number(context.vars.min_threads ?? 6); const max = Number(context.vars.max_threads ?? 9); return count >= min && count <= max; })()'
+
+    - type: javascript
+      metric: thread-length
+      value: '(() => { const bodies = output.split(/^\d+\s*\/\s*\d+\s*$/gm).slice(1).map((body) => body.trim()); return bodies.length > 0 && bodies.every((body) => body.length >= 40 && body.length <= 350); })()'
+
+    - type: javascript
+      metric: core-facts
+      value: '(() => { const patterns = context.vars.required_patterns; return Array.isArray(patterns) && patterns.length > 0 && patterns.every((pattern) => new RegExp(pattern, "i").test(output)); })()'
+
+    - type: llm-rubric
+      metric: content-quality
+      threshold: 0.85
+      value: |
+        아래 기준을 관대하게 해석하지 말고 엄격하게 평가한다.
+
+        - 개발자가 실제로 겪을 법한 문제나 헷갈림에서 시작하고, 본문 설명과 직접 연결되어야 한다.
+        - 개념 정의를 나열하는 데 그치지 않고 왜 필요한지, 언제 적용하는지, 무엇을 기준으로 판단하는지 설명해야 한다.
+        - 입력의 핵심 사실, 조건, 기술 용어를 빠뜨리거나 왜곡하지 않아야 한다.
+        - 입력에 없는 예시는 일반적으로 타당해야 하며, 근거 없는 구현 세부사항이나 단정적인 사실을 추가하면 안 된다.
+        - 각 스레드는 새로운 설명을 보태야 하며 같은 내용을 표현만 바꿔 반복하면 안 된다.
+        - 과장, 광고 문구, 불필요한 이모지 없이 자연스럽고 차분한 한국어를 사용해야 한다.
+        - 마지막은 앞 문장의 단순 요약이 아니라 실제 판단에 도움이 되는 통찰로 마무리해야 한다.
+
+        모든 기준을 충족하면 1점, 사소한 문체 문제만 있으면 0.85~0.99점으로 평가한다.
+        핵심 조건 누락, 사실 왜곡, 근거 없는 주장, 눈에 띄는 반복, 본문과 무관한 도입 중 하나라도 있으면 0.84점 이하로 평가한다.
+      provider:
+        text:
+          id: openai:codex-sdk
+          config: *codex-config
+
+tests:
+  - description: useEffect cleanup의 실행 시점 설명
+    metadata:
+      case_type: standard
+    vars:
+      min_threads: 6
+      max_threads: 8
+      required_patterns:
+        - 'cleanup'
+        - '의존성'
+        - '이전|먼저'
+        - '다시|재실행'
+      content: |
+        React useEffect의 cleanup 함수는 컴포넌트가 사라질 때만 실행되는 것이 아니다.
+        의존성이 바뀌어 effect가 다시 실행되기 전에도 이전 cleanup이 실행된다.
+        이벤트 리스너나 구독을 정리할 때 이 실행 순서를 이해하는 것이 중요하다.
+
+  - description: TypeScript unknown과 any의 차이 설명
+    metadata:
+      case_type: misconception
+    vars:
+      min_threads: 6
+      max_threads: 8
+      required_patterns:
+        - 'any'
+        - 'unknown'
+        - '좁|검사|확인'
+        - '사용|접근'
+      content: |
+        TypeScript의 any는 해당 값에 대한 타입 검사를 사실상 포기하게 만든다.
+        unknown도 모든 값을 받을 수 있지만, 값을 사용하기 전에 타입을 좁혀야 한다.
+        둘 다 아무 값이나 담을 수 있다는 이유로 같은 타입처럼 생각하기 쉽다.
+
+  - description: 짧은 메모로 React key의 역할 설명
+    metadata:
+      case_type: sparse
+    vars:
+      min_threads: 6
+      max_threads: 7
+      required_patterns:
+        - 'key'
+        - 'index'
+        - '정체성|동일'
+        - '상태|state'
+      content: |
+        React의 key는 목록 경고를 없애기 위한 값이 아니라 항목의 정체성을 추적하는 기준이다.
+        index를 key로 사용하면 항목의 삽입, 삭제, 재정렬 때 기존 상태가 다른 항목에 연결될 수 있다.
+
+  - description: 정리되지 않은 메모로 Server Component 설명
+    metadata:
+      case_type: noisy
+    vars:
+      min_threads: 6
+      max_threads: 9
+      required_patterns:
+        - 'Server Component|서버 컴포넌트'
+        - 'Client Component|클라이언트 컴포넌트'
+        - 'use client'
+        - '경계|boundary'
+        - '번들|JavaScript'
+      content: |
+        메모: Server Component는 서버에서 실행되고 클라이언트 JavaScript 번들에 포함되지 않는다.
+        상태나 브라우저 API, 이벤트 핸들러가 필요하면 Client Component가 필요하다.
+        use client는 파일을 기준으로 클라이언트 경계를 만든다.
+        서버에서 데이터를 가져온 뒤 직렬화 가능한 props로 클라이언트 컴포넌트에 전달할 수 있다.
+        핵심은 모든 컴포넌트를 서버나 클라이언트 중 하나로 몰아가는 것이 아니라 경계를 정하는 일이다.
+
+  - description: 코드가 섞인 메모로 Promise.all 설명
+    metadata:
+      case_type: code-heavy
+    vars:
+      min_threads: 6
+      max_threads: 9
+      required_patterns:
+        - 'Promise\.all'
+        - 'reject|실패'
+        - 'rate limit|동시|부하'
+        - '의존|독립'
+      content: |
+        서로 의존하지 않는 비동기 작업을 반복문에서 await하면 작업이 순차적으로 실행된다.
+        const results = await Promise.all(tasks.map(runTask))처럼 구성하면 여러 작업을 함께 시작할 수 있다.
+        다만 하나라도 reject되면 Promise.all 전체가 reject되므로, 실패를 개별 처리해야 하는 상황인지 먼저 판단해야 한다.
+        무조건 병렬 처리가 빠르다고 적용하면 API rate limit이나 서버 부하가 문제가 될 수 있다.
+
+  - description: 밀도 높은 메모로 이벤트 루프 설명
+    metadata:
+      case_type: dense
+    vars:
+      min_threads: 6
+      max_threads: 9
+      required_patterns:
+        - '마이크로태스크|microtask'
+        - 'setTimeout|태스크 큐'
+        - '콜 스택|스택'
+        - '먼저|우선순위'
+      content: |
+        JavaScript는 현재 실행 중인 콜 스택이 비어야 다음 작업을 처리한다.
+        Promise의 then 같은 마이크로태스크는 setTimeout 같은 태스크보다 먼저 처리된다.
+        마이크로태스크 큐는 현재 태스크가 끝난 뒤 비워지므로, 마이크로태스크가 계속 추가되면 다음 태스크가 늦어질 수 있다.
+        중요한 것은 단순히 Promise가 setTimeout보다 빠르다고 외우는 것이 아니라 실행 순서를 결정하는 큐의 우선순위를 이해하는 것이다.

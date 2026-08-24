@@ -2,6 +2,10 @@
   "name": "yepbuddy-harness",
   "version": "1.0.0",
   "private": true,
+  "scripts": {
+    "eval:threads": "promptfoo eval -c promptfooconfig.yaml --no-share --max-concurrency 1",
+    "eval:view": "promptfoo view"
+  },
   "devDependencies": {
     "promptfoo": "^0.122.0"
   }

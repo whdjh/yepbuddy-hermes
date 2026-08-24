@@ -1,0 +1,8 @@
+{
+  "name": "yepbuddy-harness",
+  "version": "1.0.0",
+  "private": true,
+  "devDependencies": {
+    "promptfoo": "^0.122.0"
+  }
+}
